@@ -28,7 +28,6 @@ class ReflexAgent(Agent):
     headers.
     """
 
-
     def get_action(self, game_state):
         """
         You do not need to change this method, but you're welcome to.
@@ -48,7 +47,7 @@ class ReflexAgent(Agent):
         chosen_index = random.choice(best_indices) # Pick randomly among the best
 
         "Add more of your code here if you want to"
-
+        
         return legal_moves[chosen_index]
 
     def evaluation_function(self, current_game_state, action):
@@ -74,7 +73,40 @@ class ReflexAgent(Agent):
         new_scared_times = [ghostState.scared_timer for ghostState in new_ghost_states]
         
         "*** YOUR CODE HERE ***"
-        return successor_game_state.get_score()
+        # Base score
+        score = successor_game_state.get_score()
+
+        # Food Proximity Reward
+        food_list = new_food.as_list()
+        if food_list:
+            # We take the nearest food since is the one that we want to eat next
+            food_distances = [util.manhattan_distance(new_pos, food) for food in food_list]
+            min_food_distance = min(food_distances)
+            score += 10 / (min_food_distance + 1)
+
+        # Ghost Proximity Penalty
+        for ghost_state, scared_time in zip(new_ghost_states, new_scared_times):
+            ghost_pos = ghost_state.get_position()
+            ghost_distance = util.manhattan_distance(new_pos, ghost_pos)
+
+            if scared_time > 0:
+                # Reward moving closer to edible ghosts (to chase them)
+                score += 30 / (ghost_distance + 1)
+            else:
+                # Apply penalties for proximity to active ghosts
+                if ghost_distance < 2:
+                    score -= 200  # High penalty for very close ghosts
+                elif ghost_distance < 4:
+                    score -= 50 / (ghost_distance + 1)  # Smaller penalty for moderately close ghosts
+
+        # Small penalty for each remaining food item to encourage clearing food
+        score -= 2 * len(food_list)
+
+        # Penalty for STOP action High, discourages inaction
+        if action == Directions.STOP:
+            score -= 50 
+
+        return score
 
 def score_evaluation_function(current_game_state):
     """
@@ -136,8 +168,67 @@ class MinimaxAgent(MultiAgentSearchAgent):
         Returns whether or not the game state is a losing state
         """
         "*** YOUR CODE HERE ***"
-        util.raise_not_defined()
-    
+        # Get the number of pacman + ghosts
+        num_agents = game_state.get_num_agents()
+        # Calculate the maximum depth based on the number of ghosts          
+        max_depth = num_agents * self.depth
+        
+        # Maximize the value for Pacman, recursively considering the ghost's moves
+        def max_value(state, depth, agent_index, num_agents):
+            # Return the evaluation of the current state if we have reached a terminal state or max depth since there is no point on keep exploring
+            if state.is_win() or state.is_lose() or depth == max_depth:
+                return self.evaluation_function(state)
+            
+            max_eval = float('-inf')
+            legal_actions = state.get_legal_actions(agent_index)
+            
+            if Directions.STOP in legal_actions:
+                legal_actions.remove(Directions.STOP)
+            
+            best_action = None
+
+            for action in legal_actions:
+                successor = state.generate_successor(agent_index, action)
+                eval = minimax(successor, depth + 1, (agent_index + 1) % num_agents)
+                if eval > max_eval:
+                    max_eval = eval
+                    if depth == 0:  # If it's the root level, set it as the best action
+                        best_action = action
+                        
+            return best_action if depth == 0 else max_eval
+
+        # Minimize the value for ghosts, considering Pacman's possible actions
+        def min_value(state, depth, agent_index, num_agents):
+            # Return the evaluation of the current state if we have reached a terminal state or max depth since there is no point on keep exploring
+            if state.is_win() or state.is_lose() or depth == max_depth:
+                return self.evaluation_function(state)
+            
+            min_eval = float('inf')
+            legal_actions = state.get_legal_actions(agent_index)
+
+            for action in legal_actions:
+                successor = state.generate_successor(agent_index, action)
+                eval = minimax(successor, depth + 1, (agent_index + 1) % num_agents)
+                min_eval = min(min_eval, eval)
+                
+            return min_eval
+
+        # Start the minimax algorithm from Pacman's turn (index 0)
+        def minimax(state, depth, agent_index):
+            
+            # If we've reached the maximum depth or a terminal state, evaluate the state 
+            if depth == max_depth or state.is_win() or state.is_lose():
+                return self.evaluation_function(state)
+
+            # If it's Pacman's turn (maximizing player)
+            if agent_index == 0:
+                return max_value(state, depth, agent_index, num_agents)
+            else:
+                # If it's a ghost's turn (minimizing player)
+                return min_value(state, depth, agent_index, num_agents)
+        
+        # Start the minimax search with Pacman (agent_index=0) at depth 0
+        return minimax(game_state, 0, 0)    
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -151,6 +242,7 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         "*** YOUR CODE HERE ***"
         util.raise_not_defined()
 
+        
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
