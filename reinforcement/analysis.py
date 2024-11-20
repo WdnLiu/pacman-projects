@@ -69,6 +69,14 @@ def question3e():
     return answer_discount, answer_noise, answer_living_reward
     # If not possible, return 'NOT POSSIBLE'
 
+def question6():
+    """
+    Should return EITHER a 2-item tuple of (epsilon, learning rate)
+    OR the string 'NOT POSSIBLE' if there is none.
+    Epsilon is controlled by -e, learning rate by -l.
+    """
+    return 'NOT POSSIBLE'
+
 def question8():
     answer_epsilon = None
     answer_learning_rate = None
